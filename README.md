@@ -22,7 +22,22 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+### CLI
+
+The `joumae` command allows you to run arbitrary commands while locking a named resource:
+
+```
+$ joumae --resource-name your-app-servers run -- bash -c "\"echo Deployment started.; sleep 10; echo Deployment finished.\""
+```
+
+If you consecutively ran the command twice, the latter one fails because the resource is already locked.
+
+The `joumae` command requires two environment variables to be present:
+
+```
+export JOUMAE_API_ENDPOINT="https://yourid.execute-api.ap-northeast-1.amazonaws.com/yourstage/"
+export JOUMAE_API_KEY="eyJ0eXAiOiJKV1QiLCJhbGc..."
+```
 
 ## Development
 

@@ -9,18 +9,27 @@ module Joumae
     end
 
     def parse!
+      argv = @argv.dup
+
       opt = OptionParser.new
       opt.on('--resource-name VALUE') { |v| @resource_name = v }
-      opt.parse!(@argv.dup)
-      @cmd, = argv
+      opt.parse!(argv)
+      @sub, *@args= argv
+      p @sub, @args
     end
 
     def run!
       parse!
 
-      client = Joumae::Client.create
-      command = Joumae::Command.new(@cmd, resource_name: @resource_name, client: client)
-      command.run
+      case @sub
+      when "run"
+        client = Joumae::Client.create
+        cmd = @args.join(" ")
+        command = Joumae::Command.new(cmd, resource_name: @resource_name, client: client)
+        command.run!
+      else
+        fail "The sub-command #{@sub} does not exist."
+      end
     end
 
     def self.run!

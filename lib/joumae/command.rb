@@ -32,8 +32,14 @@ module Joumae
           o.each do |line| info line end
           e.each do |line| warn line end
           info w.value
+          w.value.exitstatus
         end
       end
+    end
+
+    def run!
+      status = run
+      raise RuntimeError, "Exit status is non-zero." if status != 0
     end
   end
 end
