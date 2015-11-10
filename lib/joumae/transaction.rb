@@ -40,7 +40,7 @@ module Joumae
       @finished
     end
 
-    def self.run(resource_name:, client:, &block)
+    def self.run!(resource_name:, client:, &block)
       t = new(resource_name: resource_name, client: client)
       t.start
       begin

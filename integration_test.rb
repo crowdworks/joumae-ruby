@@ -23,4 +23,4 @@ transaction.finish
 
 command = Joumae::Command.new("sleep 10", resource_name: uuid, client: client)
 
-command.run
+command.run!

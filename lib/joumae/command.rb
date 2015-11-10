@@ -1,5 +1,6 @@
 require 'joumae/transaction'
 require 'joumae/client'
+require "joumae/command_failed_error"
 require 'open3'
 
 module Joumae
@@ -13,8 +14,33 @@ module Joumae
     end
 
     def logger
-      @logger ||= Logger.new(STDOUT)
+      @logger ||= Logger.new(STDOUT).tap do |logger|
+        log_level_from_env = ENV['JOUMAE_LOG_LEVEL'] || 'INFO'
+        logger.level = Logger.const_get(log_level_from_env)
+        logger.formatter = proc do |severity, datetime, progname, msg|
+          date_format = datetime.strftime("%Y-%m-%d %H:%M:%S")
+          "#{cmd} (#{severity}): #{msg}\n"
+        end
+      end
     end
+
+    def run!
+      status = Joumae::Transaction.run!(resource_name: @resource_name, client: @client) do
+        Open3.popen3("bash") do |i, o, e, w|
+          i.write cmd
+          i.close
+          o.each do |line| puts line end
+          e.each do |line| $stderr.puts line end
+
+          debug w.value
+
+          w.value.exitstatus
+        end
+      end
+      raise Joumae::CommandFailedError.new("Exit status(=#{status}) is non-zero.", status) if status != 0
+    end
+
+    private
 
     def info(msg)
       logger.info msg
@@ -24,22 +50,8 @@ module Joumae
       logger.warn msg
     end
 
-    def run
-      Joumae::Transaction.run(resource_name: @resource_name, client: @client) do
-        Open3.popen3("bash") do |i, o, e, w|
-          i.write cmd
-          i.close
-          o.each do |line| info line end
-          e.each do |line| warn line end
-          info w.value
-          w.value.exitstatus
-        end
-      end
-    end
-
-    def run!
-      status = run
-      raise RuntimeError, "Exit status is non-zero." if status != 0
+    def debug(msg)
+      logger.debug msg
     end
   end
 end

@@ -34,7 +34,7 @@ module Joumae
 
     def post_json(url, params={})
       begin
-        logger.info "POST #{url} #{params.to_json}"
+        debug "POST #{url} #{params.to_json}"
         request = Net::HTTP::Post.new(url.path, {'Content-Type' =>'application/json'})
         request.body = params.to_json
         https = Net::HTTP.new(url.hostname, 443)
@@ -45,13 +45,16 @@ module Joumae
         # response = httpclient.post_content(url, params.to_json, header: {'Content-Type' => 'application/json'})
 
         if response.code == '404'
-          fail "Not found."
+          fail ResourceNotFoundError, "Not found."
+        elsif response.code == '423'
+          response_body_as_json = JSON.parse(response.body)
+          raise ResourceAlreadyLockedError, response_body_as_json["message"]
         elsif response.code != '200'
-          fail "Unexpected status: #{response.code}"
+          fail UnexpectedError, "Unexpected status: #{response.code}"
         end
 
-        logger.info "Code: #{response.code}"
-        logger.info "Result: #{response.body}"
+        debug "Code: #{response.code}"
+        debug "Result: #{response.body}"
 
         response_body = JSON.parse(response.body)
         response_body
@@ -77,12 +80,32 @@ module Joumae
       URI.parse("#{api_endpoint}/resources/#{name}/lock/release")
     end
 
+    protected
+
+    def debug(msg)
+      logger.debug msg
+    end
+
+    private
+
     def httpclient
       @httpclient ||= HTTPClient.new
     end
 
     def logger
-      @logger ||= Logger.new(STDOUT)
+      @logger ||= Logger.new(STDOUT).tap do |logger|
+        log_level_from_env = ENV['JOUMAE_LOG_LEVEL'] || 'INFO'
+        logger.level = Logger.const_get(log_level_from_env)
+      end
+    end
+
+    class ResourceAlreadyLockedError < StandardError
+    end
+
+    class ResourceNotFoundError < StandardError
+    end
+
+    class UnexpectedError < StandardError
     end
   end
 end
