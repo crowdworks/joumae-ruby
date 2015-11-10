@@ -20,16 +20,16 @@ module Joumae
       post_json(resources_url, {api_key: api_key, name: name})
     end
 
-    def acquire(name, acquired_by)
-      post_json(acquire_resource_url, {api_key: api_key, name: name, acquiredBy: acquired_by})
+    def acquire(name)
+      post_json(acquire_resource_url(name), {api_key: api_key})
     end
 
-    def renew(name, acquired_by)
-      post_json(renew_resource_url, {api_key: api_key, name: name, acquired_by: acquired_by})
+    def renew(name)
+      post_json(renew_resource_url(name), {api_key: api_key})
     end
 
-    def release(name, acquired_by)
-      post_json(release_resource_url, {api_key: api_key, name: name, acquired_by: acquired_by})
+    def release(name)
+      post_json(release_resource_url(name), {api_key: api_key})
     end
 
     def post_json(url, params={})
@@ -50,6 +50,9 @@ module Joumae
           fail "Unexpected status: #{response.code}"
         end
 
+        logger.info "Code: #{response.code}"
+        logger.info "Result: #{response.body}"
+
         response_body = JSON.parse(response.body)
         response_body
       rescue => e
@@ -62,16 +65,16 @@ module Joumae
       URI.parse("#{api_endpoint}/resources")
     end
 
-    def acquire_resource_url
-      URI.parse("#{api_endpoint}/resources/acquire")
+    def acquire_resource_url(name)
+      URI.parse("#{api_endpoint}/resources/#{name}/lock/acquire")
     end
 
-    def renew_resource_url
-      URI.parse("#{api_endpoint}/resources/renew")
+    def renew_resource_url(name)
+      URI.parse("#{api_endpoint}/resources/#{name}/lock/renew")
     end
 
-    def release_resource_url
-      URI.parse("#{api_endpoint}/resources/release")
+    def release_resource_url(name)
+      URI.parse("#{api_endpoint}/resources/#{name}/lock/release")
     end
 
     def httpclient
