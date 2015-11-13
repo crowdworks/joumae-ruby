@@ -29,8 +29,16 @@ module Joumae
         Open3.popen3("bash") do |i, o, e, w|
           i.write cmd
           i.close
-          o.each do |line| puts line end
-          e.each do |line| $stderr.puts line end
+
+          o.each do |line|
+            STDOUT.puts line
+            STDOUT.flush
+          end
+
+          e.each do |line|
+            STDERR.puts line
+            STDERR.flush
+          end
 
           debug w.value
 
