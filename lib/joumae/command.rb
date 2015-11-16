@@ -61,6 +61,7 @@ module Joumae
             data = f.read_nonblock(1024)
 
             mapping[f].write(data)
+            mapping[f].flush
           rescue EOFError => e
             debug e.to_s;
           end
