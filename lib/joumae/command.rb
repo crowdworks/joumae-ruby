@@ -5,6 +5,8 @@ require 'open3'
 
 module Joumae
   class Command
+    EXIT_STATUS_INTERRUPT = 130
+
     attr_reader :cmd
 
     def initialize(cmd, resource_name:, client:)
@@ -26,19 +28,13 @@ module Joumae
 
     def run!
       status = Joumae::Transaction.run!(resource_name: @resource_name, client: @client) do
-        Open3.popen3("bash") do |i, o, e, w|
-          i.write cmd
+        Open3.popen3(cmd) do |i, o, e, w|
+          unless STDIN.tty?
+            redirect(STDIN => i)
+          end
           i.close
 
-          o.each do |line|
-            STDOUT.puts line
-            STDOUT.flush
-          end
-
-          e.each do |line|
-            STDERR.puts line
-            STDERR.flush
-          end
+          redirect(o => STDOUT, e => STDERR)
 
           debug w.value
 
@@ -49,6 +45,37 @@ module Joumae
     end
 
     private
+
+    def redirect(mapping)
+      files = mapping.keys
+
+      until files.all?(&:eof) do
+        ready = IO.select(files)
+
+        continue unless ready
+
+        readable = ready[0]
+
+        readable.each do |f|
+          begin
+            data = f.read_nonblock(1024)
+
+            mapping[f].write(data)
+          rescue EOFError => e
+            debug e.to_s;
+          end
+        end
+      end
+    end
+
+    def all_eof?(files)
+      begin
+        files.all?(&:eof)
+      rescue Interrupt => e
+        warn "You've interrupted while joumae is running a command."
+        EXIT_STATUS_INTERRUPT
+      end
+    end
 
     def info(msg)
       logger.info msg
