@@ -1,14 +1,15 @@
 module Joumae
   class Transaction
-    def initialize(resource_name:, client:, renew_interval: 1)
+    def initialize(resource_name:, client:, renew_interval: 20, ttl: 30)
       @resource_name = resource_name
       @client = client
       @renew_interval = renew_interval
+      @ttl = ttl
       @finished = false
     end
 
     def start
-      @client.acquire(@resource_name)
+      @client.acquire(@resource_name, ttl: @ttl)
 
       start_thread
     end
@@ -18,9 +19,12 @@ module Joumae
 
       @thread = Thread.start {
         loop do
-          sleep @renew_interval
-          @thread.exit if finished?
-          @client.renew(@resource_name)
+          wait_started_time = Time.now
+          while Time.now - wait_started_time < @renew_interval
+            sleep 0.1
+            @thread.exit if finished?
+          end
+          @client.renew(@resource_name, ttl: @ttl)
         end
       }
     end

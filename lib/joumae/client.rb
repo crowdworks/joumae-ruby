@@ -7,25 +7,32 @@ module Joumae
     attr_reader :api_endpoint
     attr_reader :api_key
 
-    def self.create(api_endpoint: nil, api_key: nil)
-      new(api_endpoint: api_endpoint || ENV['JOUMAE_API_ENDPOINT'], api_key: api_key || ENV['JOUMAE_API_KEY'])
+    def self.create(api_endpoint: nil, api_key: nil, ttl: 15)
+      new(
+        api_endpoint: api_endpoint || ENV['JOUMAE_API_ENDPOINT'],
+        api_key: api_key || ENV['JOUMAE_API_KEY'],
+	ttl: ttl
+      )
     end
 
-    def initialize(api_endpoint:, api_key:)
+    def initialize(api_endpoint:, api_key:, ttl:)
       @api_endpoint = api_endpoint
       @api_key = api_key
+      @ttl = ttl
     end
 
     def create(name)
       post_json(resources_url, {api_key: api_key, name: name})
     end
 
-    def acquire(name)
-      post_json(acquire_resource_url(name), {api_key: api_key})
+    def acquire(name, ttl: nil)
+      params = {api_key: api_key, ttl: ttl || @ttl}
+      post_json(acquire_resource_url(name), params)
     end
 
-    def renew(name)
-      post_json(renew_resource_url(name), {api_key: api_key})
+    def renew(name, ttl: nil)
+      params = {api_key: api_key, ttl: ttl || @ttl}
+      post_json(renew_resource_url(name), params)
     end
 
     def release(name)
