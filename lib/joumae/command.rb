@@ -55,7 +55,7 @@ module Joumae
       until inputs.empty? || (inputs.size == 1 && inputs.first == STDIN) do
         debug 'starting `select`'
 
-        readable_inputs, = IO.select(inputs, [], [], 1)
+        readable_inputs, = IO.select(inputs, [], [])
         ios_ready_for_eof_check = readable_inputs
 
         debug 'finished `select`'
