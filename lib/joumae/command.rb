@@ -45,13 +45,23 @@ module Joumae
       inputs = mapping.keys
       ios_ready_for_eof_check = []
 
+      debug "Joumae::Command#redirect: mapping: " + mapping.inspect
+
       # Calling IO#eof against an IO which is not `select`ed previous blocks the current thread.
       # So you can't do something like :
       #   until inputs.all?(&:eof) do
       # Or:
       #   until (inputs - [STDIN]).all?(&:eof) do
       until inputs.empty? || (inputs.size == 1 && inputs.first == STDIN) do
+        debug 'starting `select`'
+
+        readable_inputs, = IO.select(inputs, [], [], 1)
+        ios_ready_for_eof_check = readable_inputs
+
+        debug 'finished `select`'
+
         # We can safely call `eof` without blocking against previously selected IOs.
+        debug 'starting eof check'
         ios_ready_for_eof_check.select(&:eof).each do |src|
           debug "Stopping redirection from an IO in EOF: " + src.inspect
           # `select`ing an IO which has reached EOF blocks forever.
@@ -65,8 +75,7 @@ module Joumae
           mapping[src].close if src == STDIN
         end
 
-        readable_inputs, = IO.select(inputs)
-        ios_ready_for_eof_check = []
+        break if inputs.empty? || (inputs.size == 1 && inputs.first == STDIN)
 
         readable_inputs.each do |input|
           begin
@@ -82,12 +91,12 @@ module Joumae
             # 1. Run the command:
             #   cat | bin/joumae run --resource-name test -- bundle exec ruby -v
             # 2. Press Enter several times
-            debug "Handled error: #{e}"
+            debug "Handled error: #{e}: io: #{input.inspect}"
             inputs.delete input
           end
         end
 
-        ios_ready_for_eof_check = readable_inputs
+        ios_ready_for_eof_check = inputs & readable_inputs
       end
     end
 

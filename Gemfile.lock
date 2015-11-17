@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    joumae (0.2.4)
+    joumae (0.2.5)
 
 GEM
   remote: https://rubygems.org/
