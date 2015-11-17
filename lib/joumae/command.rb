@@ -29,12 +29,7 @@ module Joumae
     def run!
       status = Joumae::Transaction.run!(resource_name: @resource_name, client: @client) do
         Open3.popen3(cmd) do |i, o, e, w|
-          unless STDIN.tty?
-            redirect(STDIN => i)
-          end
-          i.close
-
-          redirect(o => STDOUT, e => STDERR)
+          redirect(STDIN => i, o => STDOUT, e => STDERR)
 
           debug w.value
 
@@ -47,25 +42,52 @@ module Joumae
     private
 
     def redirect(mapping)
-      files = mapping.keys
+      inputs = mapping.keys
+      ios_ready_for_eof_check = []
 
-      until files.all?(&:eof) do
-        ready = IO.select(files)
+      # Calling IO#eof against an IO which is not `select`ed previous blocks the current thread.
+      # So you can't do something like :
+      #   until inputs.all?(&:eof) do
+      # Or:
+      #   until (inputs - [STDIN]).all?(&:eof) do
+      until inputs.empty? || (inputs.size == 1 && inputs.first == STDIN) do
+        # We can safely call `eof` without blocking against previously selected IOs.
+        ios_ready_for_eof_check.select(&:eof).each do |src|
+          debug "Stopping redirection from an IO in EOF: " + src.inspect
+          # `select`ing an IO which has reached EOF blocks forever.
+          # So you have to delete such IO from the array of IOs to `select`.
+          inputs.delete src
 
-        continue unless ready
+          # You must close the child process' STDIN immeditely after the parent's STDIN reached EOF,
+          # or some kinds of child processes never exit.
+          # e.g.) echo foobar | joumae run -- cat
+          # After the `echo` finished outputting `foobar`, you have to tell `cat` about that or `cat` will wait for more inputs forever.
+          mapping[src].close if src == STDIN
+        end
 
-        readable = ready[0]
+        readable_inputs, = IO.select(inputs)
+        ios_ready_for_eof_check = []
 
-        readable.each do |f|
+        readable_inputs.each do |input|
           begin
-            data = f.read_nonblock(1024)
-
-            mapping[f].write(data)
-            mapping[f].flush
+            data = input.read_nonblock(1024)
+            output = mapping[input]
+            output.write(data)
+            output.flush
           rescue EOFError => e
-            debug e.to_s;
+            debug "Reached EOF: #{e}"
+            inputs.delete input
+          rescue Errno::EPIPE => e
+            # How to produce this error:
+            # 1. Run the command:
+            #   cat | bin/joumae run --resource-name test -- bundle exec ruby -v
+            # 2. Press Enter several times
+            debug "Handled error: #{e}"
+            inputs.delete input
           end
         end
+
+        ios_ready_for_eof_check = readable_inputs
       end
     end
 
